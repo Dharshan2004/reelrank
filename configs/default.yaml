@@ -1,0 +1,24 @@
+seed: 42
+data:
+  train_end: 20220421
+  val_end: 20220428
+  history_n: 20
+retrieval:
+  epochs: 3
+  batch_size: 1024
+  emb_dim: 64
+  temperature: 0.05
+  max_eval_users: 1500
+ranking:
+  max_train: 400000
+  max_val: 80000
+  mmoe_experts: 4
+  loss_weights: [1.0, 1.5, 1.0]
+  fusion_weights: [0.3, 0.5, 0.2]
+safety:
+  n_labels: 1500
+  threshold: 0.5
+serve:
+  port: 43123
+  retrieve_k: 200
+  k: 10

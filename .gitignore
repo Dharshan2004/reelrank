@@ -1,0 +1,36 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+
+# Raw + processed data (download locally / in cloud)
+data/raw/
+data/processed/
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Model artifacts
+artifacts/
+*.pt
+*.pth
+*.faiss
+*.joblib
+*.pkl
+
+# Env / secrets
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Uploads from agent session
+uploads/
