@@ -1,0 +1,33 @@
+{
+  "config": {
+    "high": 0.7,
+    "low": 0.3
+  },
+  "config_hash": "af32d4ba1c07",
+  "created_at": "2026-10-30T10:06:54Z",
+  "extra": {
+    "judge": {
+      "cost_samples": [],
+      "llm_calls": 0,
+      "mode": "heuristic",
+      "n_labeled": 1500,
+      "note": "OPENAI_API_KEY missing; heuristic/rule labels used"
+    }
+  },
+  "git_sha": "b2c984c3179a74c37d8cb55ca79a36865c4c454c",
+  "metrics": {
+    "blocked_classifier": 67,
+    "blocked_rules": 12,
+    "labeled_precision_proxy": 1.0,
+    "n_videos": 7583,
+    "pct_to_llm": 0.9243043650270342,
+    "thresholds": {
+      "high": 0.7,
+      "low": 0.3
+    },
+    "uncertain_band_to_llm": 7009
+  },
+  "run_id": "safety_cascade",
+  "seed": null,
+  "stage": "safety"
+}

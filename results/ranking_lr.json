@@ -1,0 +1,28 @@
+{
+  "config": {
+    "model": "lr"
+  },
+  "config_hash": "660b135f6cc4",
+  "created_at": "2026-10-30T10:04:53Z",
+  "git_sha": "b2c984c3179a74c37d8cb55ca79a36865c4c454c",
+  "metrics": {
+    "is_click": {
+      "auc": 0.5795071712192681,
+      "gauc": 0.5857334900562214,
+      "logloss": 0.4819810688495636
+    },
+    "is_like": {
+      "auc": 0.613251701766724,
+      "gauc": 0.5465129887575234,
+      "logloss": 0.03691514953970909
+    },
+    "long_view": {
+      "auc": 0.6015943578791862,
+      "gauc": 0.604357289763865,
+      "logloss": 0.3207736313343048
+    }
+  },
+  "run_id": "ranking_lr",
+  "seed": 42,
+  "stage": "ranking"
+}

@@ -1,0 +1,19 @@
+{
+  "run_id": "serving_loadtest",
+  "stage": "serving",
+  "metrics": {
+    "n_requests": 100,
+    "concurrency": 4,
+    "errors": 0,
+    "qps": 40.11177574705903,
+    "p50_ms": 98.02807800019764,
+    "p95_ms": 121.60567999990235,
+    "p99_ms": 142.15746299987586,
+    "mean_ms": 99.13061184999378,
+    "hardware": {
+      "platform": "Linux-6.12.94+-x86_64-with-glibc2.39",
+      "processor": "x86_64",
+      "python": "3.12.3"
+    }
+  }
+}

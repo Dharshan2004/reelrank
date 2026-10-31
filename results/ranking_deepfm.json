@@ -1,0 +1,29 @@
+{
+  "config": {
+    "epochs": 2,
+    "model": "deepfm"
+  },
+  "config_hash": "d1a9f2fead97",
+  "created_at": "2026-10-30T10:05:33Z",
+  "git_sha": "b2c984c3179a74c37d8cb55ca79a36865c4c454c",
+  "metrics": {
+    "is_click": {
+      "auc": 0.510923080098223,
+      "gauc": 0.514411544971561,
+      "logloss": 1.5905382633209229
+    },
+    "is_like": {
+      "auc": 0.5317245411181489,
+      "gauc": 0.5629281313023747,
+      "logloss": 0.24021142721176147
+    },
+    "long_view": {
+      "auc": 0.5101881313987395,
+      "gauc": 0.5111568829941422,
+      "logloss": 1.453608751296997
+    }
+  },
+  "run_id": "ranking_deepfm",
+  "seed": 42,
+  "stage": "ranking"
+}
