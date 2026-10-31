@@ -112,4 +112,4 @@ def catalogue_coverage(recommended_lists: Iterable[Sequence[int]], catalogue_siz
         seen.update(recs)
     if catalogue_size <= 0:
         return 0.0
-    return float(len(seen / catalogue_size))
+    return float(len(seen) / catalogue_size)
