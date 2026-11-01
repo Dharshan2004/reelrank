@@ -1,0 +1,40 @@
+{
+  "config": {
+    "csv": "/Users/priyadharshan/Desktop/reelrank/artifacts/safety_human_spotcheck.csv",
+    "labels": [
+      "safe",
+      "unsafe"
+    ]
+  },
+  "config_hash": "845fce0230c8",
+  "created_at": "2026-11-01T07:05:32Z",
+  "git_sha": "e8a80cd0f5cfcd9c22b035b36e25b9c78ceedb7f",
+  "metrics": {
+    "agreement": 0.97,
+    "cohen_kappa": 0.0,
+    "confusion_matrix": {
+      "labels": [
+        "safe",
+        "unsafe"
+      ],
+      "matrix": [
+        [
+          194,
+          0
+        ],
+        [
+          6,
+          0
+        ]
+      ]
+    },
+    "human_unsafe": 0,
+    "judge_unsafe": 6,
+    "n_labeled": 200,
+    "n_spotcheck_rows": 200,
+    "n_unlabeled": 0
+  },
+  "run_id": "safety_human_kappa",
+  "seed": null,
+  "stage": "safety"
+}
