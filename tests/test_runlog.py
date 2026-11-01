@@ -38,5 +38,6 @@ def test_run_records_support_external_storage(tmp_path, monkeypatch):
     monkeypatch.setattr(runlog, "_git_sha", lambda: "test-sha")
     result = json.loads(runlog.write_result("external", "test", {}).read_text())
     from pathlib import Path
-    assert Path(result["record_path"]).is_file()
-    assert str(external / "input.json") in result["provenance"]["input_files"]
+    assert not Path(result["record_path"]).is_absolute()
+    assert (root / result["record_path"]).is_file()
+    assert "../external/input.json" in result["provenance"]["input_files"]

@@ -55,13 +55,21 @@ def test_training_seeds_share_cohort_and_keep_outputs_isolated(tmp_path):
         artifacts = tmp_path / f'artifacts{seed}'
         results = tmp_path / f'results{seed}'
         env = child_environment(artifacts, results)
+        artifacts.mkdir()
+        (artifacts / 'two_tower.pt').write_bytes(b'original serving checkpoint')
         env['REELRANK_DATA_DIR'] = str(data.parent)
         process = subprocess.run([sys.executable, '-m', 'reelrank.retrieval.train',
                                   '--epochs', '1', '--batch-size', '8', '--emb-dim', '4',
-                                  '--seed', str(seed), '--cohort-seed', '42', '--max-eval-users', '2'],
+                                  '--seed', str(seed), '--cohort-seed', '42', '--max-eval-users', '2', '--tag', 'manual'],
                                  env=env, capture_output=True, text=True)
         assert process.returncode == 0, process.stderr
+        duplicate = subprocess.run([sys.executable, '-m', 'reelrank.retrieval.train', '--tag', 'manual'],
+                                   env=env, capture_output=True, text=True)
+        assert duplicate.returncode != 0 and 'tag already exists' in duplicate.stderr
+        assert (artifacts / 'two_tower.pt').read_bytes() == b'original serving checkpoint'
+        artifacts, results = artifacts / 'manual', results / 'manual'
         record, scores = load_record(results / 'retrieval_two_tower.json')
+        assert not Path(record['extra']['per_user_scores']).is_absolute()
         assert record['seed'] == seed
         assert (artifacts / 'two_tower.pt').is_file()
         assert (artifacts / 'index_flat.faiss').is_file()
@@ -87,3 +95,11 @@ def test_record_loader_rejects_changed_evidence(tmp_path):
     pd.DataFrame({'user_id': [1, 2], 'recall@200': [.2, .4]}).to_parquet(scores)
     with pytest.raises(ValueError, match='checksum'):
         load_record(path)
+
+
+@pytest.mark.parametrize('tag', ['../escape', '/absolute', '.', 'bad/name'])
+def test_manual_tag_rejects_unsafe_names(tag):
+    process = subprocess.run([sys.executable, '-m', 'reelrank.retrieval.train', '--tag', tag],
+                             capture_output=True, text=True)
+    assert process.returncode != 0
+    assert 'tag must' in process.stderr

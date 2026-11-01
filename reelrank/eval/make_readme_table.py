@@ -15,6 +15,8 @@ def main() -> None:
             # Retained historical files predate the corrected feature contract.
             continue
         data = json.loads(path.read_text())
+        if "metrics" not in data:
+            continue  # Metadata manifests are not evaluation runs.
         metrics = data.get("metrics", {})
         if data.get("stage") == "retrieval_seed_sweep":
             # Keep the summary compact; full per-seed intervals live in its JSON.

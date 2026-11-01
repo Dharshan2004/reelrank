@@ -1,6 +1,6 @@
 {
   "config": {
-    "csv": "/Users/priyadharshan/Desktop/reelrank/artifacts/safety_human_spotcheck.csv",
+    "csv": "artifacts/safety_human_spotcheck.csv",
     "labels": [
       "safe",
       "unsafe"

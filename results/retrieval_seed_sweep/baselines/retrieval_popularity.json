@@ -16,7 +16,7 @@
   "created_at": "2026-11-01T14:48:19Z",
   "extra": {
     "archived_per_user_scores": "results/retrieval_seed_sweep/baselines/runs/20261101T144819Z-retrieval_popularity-14890e95/per_user_scores.parquet",
-    "per_user_scores": "/Users/priyadharshan/Desktop/reelrank/results/retrieval_seed_sweep/baselines/retrieval_popularity_per_user.parquet",
+    "per_user_scores": "results/retrieval_seed_sweep/baselines/retrieval_popularity_per_user.parquet",
     "per_user_sha256": "40bde3bd64f01b5f4665a2ec17837f14a0c1b1e8bd10b1303d571232ec2fa1e2"
   },
   "git_sha": "6633d167c80710a1a53e409f8bdfd71feb771179",

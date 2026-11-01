@@ -14,7 +14,7 @@ import sys
 import time
 
 from reelrank.data.paths import ARTIFACTS, RESULTS, ROOT
-from reelrank.eval.runlog import file_hash
+from reelrank.eval.runlog import file_hash, _record_path
 
 
 def child_environment(artifacts: Path, results: Path) -> dict[str, str]:
@@ -37,7 +37,7 @@ def main():
     artifact_root = ARTIFACTS / args.name
     if dest.exists() or artifact_root.exists():
         parser.error("sweep directory exists; inspect prior work before choosing a new name")
-    protected = {str(p): file_hash(p) for directory in (ARTIFACTS, RESULTS)
+    protected = {_record_path(p): file_hash(p) for directory in (ARTIFACTS, RESULTS)
                  for p in directory.iterdir() if p.is_file()}
     reference = json.loads((RESULTS / "retrieval_two_tower.json").read_text())["metrics"]["recall@200"]
     protocol = {"seeds": args.seeds, "epochs": 8, "batch_size": 1024, "lr": 0.001,
@@ -65,7 +65,7 @@ def main():
             if abs(measured-reference) > protocol["reproduction_tolerance"]:
                 raise RuntimeError(f"Seed42 reproduction gate failed: {measured} vs {reference}; investigate before continuing")
     run("baselines", "reelrank.retrieval.baselines", ["--seed", "42", "--max-eval-users", "2000"])
-    changed = [p for p, digest in protected.items() if not Path(p).is_file() or file_hash(Path(p)) != digest]
+    changed = [p for p, digest in protected.items() if not (ROOT / p).is_file() or file_hash(ROOT / p) != digest]
     if changed:
         raise RuntimeError(f"Protected serving/result files changed: {changed}")
     (dest / "integrity.json").write_text(json.dumps({"protected_files_unchanged": True, "count": len(protected)}, indent=2)+"\n")

@@ -23,9 +23,9 @@ make test
 .venv/bin/python -m reelrank.eval.seed_sweep --name retrieval_seed_sweep
 ```
 
-The default seeds are predeclared above. The runner refuses existing output directories: inspect any partial run before starting a distinctly named experiment. It does not automatically restart failed runs. The five full eight-epoch runs each completed in 30–32 seconds in the existing local environment, plus about two seconds for baselines; this is not a guaranteed runtime on another machine.
+The default seeds are predeclared above. The runner refuses existing output directories: inspect any partial run before starting a distinctly named experiment. It does not automatically restart failed runs. The five full eight-epoch runs each completed in 30-32 seconds in the existing local environment, plus about two seconds for baselines; this is not a guaranteed runtime on another machine.
 
-Each child process sets `REELRANK_ARTIFACTS_DIR` and `REELRANK_RESULTS_DIR` before imports. Model bundles live under `artifacts/<name>/seed<seed>/`; evidence lives under `results/<name>/seed<seed>/`. Baselines have their own directories. This isolates checkpoints, embeddings, Flat/HNSW indexes and result aliases—not just result filenames. The top-level serving artifacts and pre-existing top-level result files are hashed before execution and checked afterward.
+Each child process sets `REELRANK_ARTIFACTS_DIR` and `REELRANK_RESULTS_DIR` before imports. Model bundles live under `artifacts/<name>/seed<seed>/`; evidence lives under `results/<name>/seed<seed>/`. Baselines have their own directories. This isolates checkpoints, embeddings, Flat/HNSW indexes and result aliases - not just result filenames. The top-level serving artifacts and pre-existing top-level result files are hashed before execution and checked afterward.
 
 `protocol.json` is written before training. Each run records cohort, relevance and candidate-pool fingerprints plus source/input hashes and checksummed per-user scores in its immutable run archive. The summary rejects incompatible cohorts, input fingerprints, hyperparameters, duplicate users, altered score files and source changes across training seeds.
 

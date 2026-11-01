@@ -22,7 +22,7 @@
   "created_at": "2026-11-01T14:47:15Z",
   "extra": {
     "archived_per_user_scores": "results/retrieval_seed_sweep/seed44/runs/20261101T144715Z-retrieval_two_tower-7557dad3/per_user_scores.parquet",
-    "per_user_scores": "/Users/priyadharshan/Desktop/reelrank/results/retrieval_seed_sweep/seed44/retrieval_two_tower_per_user.parquet",
+    "per_user_scores": "results/retrieval_seed_sweep/seed44/retrieval_two_tower_per_user.parquet",
     "per_user_sha256": "6da5908fa471e46a413be9f3fe3c80d25efc94b80670912076d6ba17fee83147"
   },
   "git_sha": "6633d167c80710a1a53e409f8bdfd71feb771179",

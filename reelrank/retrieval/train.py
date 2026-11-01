@@ -5,6 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import subprocess
+import sys
 from pathlib import Path
 
 # Avoid Torch+FAISS OpenMP double-init crashes on macOS (seen as make Error 139).
@@ -17,7 +20,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
-from reelrank.data.paths import ARTIFACTS, PROCESSED
+from reelrank.data.paths import ARTIFACTS, PROCESSED, RESULTS
 from reelrank.data.history import TimestampHistory
 from reelrank.eval.runlog import write_result
 from reelrank.retrieval.baselines import build_user_positives, evaluate_retrieval, evaluation_cohort, per_user_evidence
@@ -350,7 +353,26 @@ def main() -> None:
     parser.add_argument("--cohort-seed", type=int, default=42)
     parser.add_argument("--max-eval-users", type=int, default=2000)
     parser.add_argument("--label", choices=["long_view", "is_click"], default="long_view")
+    parser.add_argument("--tag", help="Save a manual run under artifacts/<tag> and results/<tag>")
     args = parser.parse_args()
+    if args.tag is not None:
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", args.tag):
+            parser.error("tag must start with a letter/digit and contain only letters, digits, _, . or -")
+        artifacts, results = ARTIFACTS / args.tag, RESULTS / args.tag
+        if artifacts.exists() or results.exists():
+            parser.error("tag already exists; choose a new tag to preserve the previous run")
+        artifacts.mkdir(parents=True)
+        results.mkdir(parents=True)
+        env = {**os.environ, "REELRANK_ARTIFACTS_DIR": str(artifacts),
+               "REELRANK_RESULTS_DIR": str(results)}
+        # Re-import in a child so every module (including FAISS/runlog) shares
+        # the new roots. Merely changing this module's globals is insufficient.
+        command = [sys.executable, "-m", "reelrank.retrieval.train"]
+        for key, value in vars(args).items():
+            if key != "tag":
+                command.extend(["--" + key.replace("_", "-"), str(value)])
+        subprocess.run(command, env=env, check=True)
+        return
     train_two_tower(
         epochs=args.epochs,
         batch_size=args.batch_size,

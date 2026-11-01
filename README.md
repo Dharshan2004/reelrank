@@ -2,7 +2,7 @@
 
 A reproducible short-video recommendation prototype on **KuaiRand-Pure**: two-tower retrieval → caption safety filter → ranking → top-k API.
 
-The project compares simple and neural models, tests training/serving consistency, and records both successful and unsuccessful experiments. **LR is the default serving ranker**, chosen by long-view GAUC on standard validation; DeepFM and MMoE remain comparison models. All rankers receive the same train-fitted features. LR has additive effects, so user features change probabilities but do not alone change its item ordering; two-tower retrieval provides personalized candidates. DeepFM/MMoE can learn user–item interactions.
+The project compares simple and neural models, tests training/serving consistency, and records both successful and unsuccessful experiments. **LR is the default serving ranker**, chosen by long-view GAUC on standard validation; DeepFM and MMoE remain comparison models. All rankers receive the same train-fitted features. LR has additive effects, so user features change probabilities but do not alone change its item ordering; two-tower retrieval provides personalized candidates. DeepFM/MMoE can learn user-item interactions.
 
 ```mermaid
 flowchart LR
@@ -45,7 +45,7 @@ The example fits a tiny ranker on synthetic interactions, filters a candidate li
 
 Retrieval uses the same 2,000-user cohort for all seeds and both baselines. The intervals bootstrap **seed-averaged per-user recall differences**, conditional on these five fitted models; they do not cover all training uncertainty. All five point estimates exceed both baselines, but three of five per-seed intervals versus popularity cross zero (all five versus ItemCF exclude zero). Per-seed intervals and results are in the [sweep summary](results/retrieval_seed_sweep/SUMMARY.md). The current serving bundle remains seed 42 (Recall@200 0.06956); no best-seed selection was performed.
 
-The random log sparsely observes outcomes in a 7,583-item candidate pool. Unobserved user–item outcomes are unknown; Recall@200 measures recovery of observed long-view positives, not complete user relevance. A uniformly sampled set of 200 distinct candidates has theoretical expected recall `200 / 7,583 ≈ 0.0264`; this is an analytical reference, not a measured run. Compare models under the same evaluation contract, without treating sparsity as an explanation for every shortfall.
+The random log sparsely observes outcomes in a 7,583-item candidate pool. Unobserved user-item outcomes are unknown; Recall@200 measures recovery of observed long-view positives, not complete user relevance. A uniformly sampled set of 200 distinct candidates has theoretical expected recall `200 / 7,583 ≈ 0.0264`; this is an analytical reference, not a measured run. Compare models under the same evaluation contract, without treating sparsity as an explanation for every shortfall.
 
 **End-to-end uncertainty remains:** the original LR cascade with safety scored NDCG@10 0.003587 versus 0.002790 for popularity→LR (+28.5% point estimate), but the paired absolute-difference interval [-0.000265, +0.001892] crosses zero. The retrieval sweep does not establish a cascade or online improvement.
 
@@ -78,6 +78,8 @@ make loadtest
 Full reproduction requires downloading data and training models; it is separate from the quickstart. Data and artifacts are not included in Git. Python/pip users can instead create and activate a virtual environment and run `python -m pip install -e '.[dev]'`; this does not use the uv lockfile.
 
 `make train-safety` uses paid LLM labeling if `OPENAI_API_KEY` is set; otherwise it falls back to rules. To explicitly use the no-key path, run `env -u OPENAI_API_KEY make train-safety`. This produces different labels from the recorded LLM-source experiment. Serving never calls an LLM. See the [evaluation and safety limitations](docs/evaluation.md).
+
+For an isolated manual retrieval experiment, run `python -m reelrank.retrieval.train --tag experiment-01`. This writes the full model/index bundle to `artifacts/experiment-01/` and evidence to `results/experiment-01/`, refusing an existing tag. Untagged training intentionally updates the default bundle.
 
 To serve MMoE, use `make serve RANKER=mmoe`. Old checkpoints without the saved feature transformer require retraining. See [reference defaults](docs/reference-defaults.md) and each module's `--help`; settings come from CLI arguments and Make variables.
 

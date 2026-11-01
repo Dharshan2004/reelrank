@@ -1,12 +1,12 @@
 # ReelRank improvement work log
 
-## 1 November 2026 — correctness, evaluation and interview evidence
+## 1 November 2026  -  correctness, evaluation and interview evidence
 
 **Objective:** strengthen the full retrieval → safety filter → ranking → serving project for an internship application, with reproducible evidence rather than unsupported performance claims.
 
 **Starting point:** HEAD `e8a80cd`, with existing uncommitted user changes. Earlier audits identified missing user inputs in ranking, train/serve feature mismatch, test-tuned fusion, future training histories, unequal baseline policies, weak safety validation and incomplete run provenance. The pre-change cascade's +9.00% / +12.27% exploratory lifts reproduced, but paired bootstrap intervals included zero.
 
-**Preservation:** copied existing model/artifact files and results into `artifacts/archive/pre-correctness-20261101T072925Z/` before retraining. Existing user edits are being retained. No commits, pushes or paid label-generation jobs have been initiated.
+**Preservation:** copied existing model/artifact files and results into `artifacts/archive/pre-correctness-20261101T072925Z/` before retraining. Existing user edits are being retained. At this stage no commits, pushes or paid label-generation jobs had been initiated.
 
 **Implemented:**
 
@@ -23,7 +23,7 @@ The code, models and evaluations were rebuilt locally. Changes and results follo
 - Reworked LR to use sparse one-hot encoded categorical fields. DeepFM and MMoE receive the same information. Stabilized DeepFM initialization and added clipping to neural training.
 - Standard validation selects neural checkpoints by log loss and MMoE fusion by long-view AUC. Random data is loaded for evaluation only after choices are fixed, and marked previously inspected exploratory reuse.
 - Chose LR for serving on primary standard-validation long-view GAUC; retained MMoE behind `RANKER=mmoe` / `REELRANK_RANKER=mmoe`. This is a baseline decision, not a claim that multi-task learning won.
-- LR remains additive: user effects shift its probabilities but alone do not personalize item order. Retrieval supplies personalized candidate sets; neural rankers support learned user–item interactions.
+- LR remains additive: user effects shift its probabilities but alone do not personalize item order. Retrieval supplies personalized candidate sets; neural rankers support learned user-item interactions.
 
 ### Retrieval
 
@@ -94,7 +94,7 @@ All intervals cross zero. These exploratory point estimates do **not** establish
 - Real localhost smoke returned 10 valid items for users 1, 42, 100 and unknown user 99999999; LR/Flat artifacts loaded successfully.
 - The first localhost attempt was blocked by the filesystem/network sandbox (bind/connect operation not permitted), producing an all-error load-test record. It is retained as a failed infrastructure attempt, not a model-performance measurement. Localhost execution was then approved and the actual API/load test rerun.
 - The demo GIF was regenerated from the corrected LR service. Analysis notebook now has an executable generator using existing dependencies, replacing unexecuted aggregate-chart cells.
-- The completed approved 60-second Locust run sent **2,890 requests**, **zero failures**, **48.36 QPS**, **31 ms p50**, **79 ms p95**, **100 ms p99** at eight clients on macOS ARM, with 50–200 ms think time. This is achieved throughput, not a capacity ceiling. Immutable record: `results/runs/20261101T073944Z-serving_loadtest-2ee00139/result.json`.
+- The completed approved 60-second Locust run sent **2,890 requests**, **zero failures**, **48.36 QPS**, **31 ms p50**, **79 ms p95**, **100 ms p99** at eight clients on macOS ARM, with 50-200 ms think time. This is achieved throughput, not a capacity ceiling. Immutable record: `results/runs/20261101T073944Z-serving_loadtest-2ee00139/result.json`.
 - The analysis generator executed **seven cells with zero error outputs**. The five-frame GIF was refreshed and a representative frame visually checked; it identifies LR and displays actual API scores/timings.
 - `git diff --check` passed. The only test warning is the environment's existing Starlette/httpx deprecation warning.
 
@@ -104,10 +104,10 @@ All intervals cross zero. These exploratory point estimates do **not** establish
 - Bootstrap intervals cover user sampling, not multiple training seeds. Run a predeclared seed sweep and independent confirmation before claiming reliable lift.
 - Pure histories are partial, and static feature snapshot timing is not fully resolved. Numeric normalization for retrieval and categorical field separation remain controlled follow-up experiments.
 - Safety is caption-only, with weak classifier performance and no demonstrated unsafe recall from the all-safe review set. A new independently annotated set is needed; none was fabricated or purchased during this work.
-- LR's additive structure limits personalized reordering. A user–item interaction model should earn deployment through validation and a controlled cascade comparison.
+- LR's additive structure limits personalized reordering. A user-item interaction model should earn deployment through validation and a controlled cascade comparison.
 - No clean-room Docker build, remote deployment or production-capacity claim was made.
 
-## Repository polish — 2026-11-01
+## Repository polish  -  2026-11-01
 
 - Reorganized the README around the project, quickstart, results, reproduction and repository map. Moved detailed methodology/safety limitations and interview notes to dedicated documents without changing recorded metrics.
 - Added a results index that labels historical cascade files and current aliases; preserved immutable records and existing filenames.
@@ -116,21 +116,28 @@ All intervals cross zero. These exploratory point estimates do **not** establish
 - Added `make example`, a synthetic ranking/filtering walkthrough using shared inference code, with no downloads, artifact writes, or benchmark claims.
 - Added storage environment overrides and external-path support in run logging; installed packages default storage to the working directory instead of site-packages.
 - Updated Docker to install locked dependencies and mount data/artifacts; added an allowlist-style `.dockerignore`.
-- Added `docs/COMMIT_PLAN.md` covering existing and new changes in four dependency-aware phases. No staging, commits, history rewrites or pushes performed. No CI or contributing guidelines added.
+- Added `docs/COMMIT_PLAN.md` covering existing and new changes in four dependency-aware phases. At this stage no staging, commits, history rewrites or pushes had been performed. No CI or contributing guidelines added.
 - Validation: 29 tests passed; synthetic example ran successfully; wheel and source distribution built. Docker runtime validation was unavailable because the Docker daemon was not running. One existing Starlette/httpx deprecation warning remains.
 - Authorship check: no Codex author or co-author found in local history; the initial commit is authored by Cursor Agent. Existing history was left unchanged.
 
-## Local commit execution — 2026-11-01
+## Local commit execution  -  2026-11-01
 
 The user subsequently authorized the four planned local commits, explicitly prohibiting a push and Codex contributor attribution. Commits use the configured Dharshan2004 identity with no co-author trailers. Isolated staged snapshots passed 27 tests for phase 1 and 29 for phase 2. Existing history, including the initial Cursor Agent author, remains unchanged.
 
-## Retrieval seed sweep — 2026-11-01
+## Retrieval seed sweep  -  2026-11-01
 
 - Added an independent `--cohort-seed` to retrieval training and checksummed per-user recall evidence to neural and baseline evaluation.
-- Added a runner with predeclared seeds 42–46, fixed eight-epoch settings, isolated artifact/result roots, an exact seed-42 reproduction gate, and before/after protection of the original top-level artifacts/results. No serving model replacement or hyperparameter tuning occurred.
+- Added a runner with predeclared seeds 42-46, fixed eight-epoch settings, isolated artifact/result roots, an exact seed-42 reproduction gate, and before/after protection of the original top-level artifacts/results. No serving model replacement or hyperparameter tuning occurred.
 - All five runs completed: Recall@200 0.069556, 0.065714, 0.064123, 0.066361, 0.067564; mean 0.066664, sample SD 0.002039. Popularity 0.058418; ItemCF 0.053501.
 - Mean relative lifts: +14.11% versus popularity, +24.60% versus ItemCF. Seed-averaged paired user-bootstrap absolute-difference intervals: [0.000924, 0.015759] and [0.005487, 0.020763]. Three individual-seed intervals versus popularity cross zero; all five versus ItemCF exclude zero. These are conditional user intervals, not full training uncertainty.
 - Updated the README with one sourced results table, analytical uniform-random reference, seed variation, interval scope and unchanged end-to-end limitations. Preserved clearly labeled historical audits and run records instead of rewriting history.
 - Added integration coverage running two tiny training jobs with different training seeds, a fixed cohort, separate output roots and verified per-user evidence; added mismatched-pair and tampered-evidence checks.
 - Source snapshots for the five full training runs match. The seed-42 rerun reproduces the prior recall exactly; the integrity record confirms protected files were unchanged. No paid API calls or remote training services used.
-- Final verification: 33 tests passed and the synthetic example ran; all 22 original artifact files remain byte-identical. README/documentation links and the exact seed-42 reproduction gate were checked. Changes are recorded as local implementation and results/documentation commits on `codex/retrieval-seed-sweep`, with the configured user identity and no co-author trailers; nothing pushed.
+- Final verification: 33 tests passed and the synthetic example ran; all 22 original artifact files remain byte-identical. README/documentation links and the exact seed-42 reproduction gate were checked. The implementation and results/documentation commits were subsequently pushed and fast-forward merged into `main` at `136d10c`, with the configured user identity and no co-author trailers.
+
+## Public repository cleanup - 2026-11-01
+
+- Added `--tag` for isolated manual retrieval runs; existing tags are rejected, and untagged runs retain the explicit default training behavior.
+- Normalized published JSON path metadata to repository-relative paths, including the sweep protocol and per-user score references. Updated summary reference checksums after normalization; model metrics, per-user parquet bytes and historical source archives are unchanged. Protocol protection hashes still describe files at the original run time, before this metadata cleanup.
+- Renamed the signed summary field to `mean_difference`, normalized punctuation in the requested documents, and updated the merged/pushed status above.
+- Verification: full suite passed (37 tests); the focused tag/evidence suite passed again after adding duplicate-tag checks. Copying the sweep evidence to another directory regenerated identical summary metrics and validated all per-user checksums. No model retraining or performance changes were required.

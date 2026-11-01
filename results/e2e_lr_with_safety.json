@@ -21,7 +21,7 @@
   "extra": {
     "archived_per_user_scores": "results/runs/20261101T073615Z-e2e_lr_with_safety-149cd955/per_user_scores.parquet",
     "interpretation": "Observed-positive offline ranking; missing user-item outcomes are not observed negatives. Bootstrap covers user sampling, not training-seed variation.",
-    "per_user_scores": "/Users/priyadharshan/Desktop/reelrank/artifacts/e2e_lr_with_safety_per_user.parquet"
+    "per_user_scores": "artifacts/e2e_lr_with_safety_per_user.parquet"
   },
   "git_sha": "e8a80cd0f5cfcd9c22b035b36e25b9c78ceedb7f",
   "metrics": {

@@ -85,7 +85,7 @@ def summarize(directory):
         comparisons[method] = {
             "recall@200": float(values.mean()),
             "relative_lift_of_seed_mean_pct": float((means.mean()/values.mean()-1)*100),
-            "mean_absolute_difference": float((averaged-values.to_numpy()).mean()),
+            "mean_difference": float((averaged-values.to_numpy()).mean()),
             "seed_averaged_user_difference_ci95": paired_interval(averaged-values.to_numpy(), **kwargs),
             "per_seed_difference_ci95": {str(s): paired_interval(v.to_numpy()-values.to_numpy(), **kwargs)
                                            for s, v in zip(seeds, scores)},

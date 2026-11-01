@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import hashlib
 import json
 import subprocess
@@ -16,11 +17,8 @@ from reelrank.data.paths import RESULTS, ROOT, ARTIFACTS, PROCESSED
 
 
 def _record_path(path: Path) -> str:
-    """Keep checkout-relative paths when possible; support external storage."""
-    try:
-        return str(path.relative_to(ROOT))
-    except ValueError:
-        return str(path.resolve())
+    """Serialize paths relative to the checkout, including external storage."""
+    return Path(os.path.relpath(path.resolve(), ROOT.resolve())).as_posix()
 
 
 def file_hash(path: Path) -> str:
@@ -96,9 +94,11 @@ def write_result(
             snapshot.write(ROOT / relative, arcname=relative)
     if extra and extra.get("per_user_scores"):
         scores = Path(extra["per_user_scores"])
+        if not scores.is_absolute():
+            scores = ROOT / scores
         if scores.is_file():
             shutil.copy2(scores, archive / "per_user_scores.parquet")
-            payload["extra"] = {**extra, "archived_per_user_scores": _record_path(archive / "per_user_scores.parquet")}
+            payload["extra"] = {**extra, "per_user_scores": _record_path(scores), "archived_per_user_scores": _record_path(archive / "per_user_scores.parquet")}
     serialized = json.dumps(payload, indent=2, sort_keys=True)
     (archive / "result.json").write_text(serialized)
     path = RESULTS / f"{run_id}.json"
