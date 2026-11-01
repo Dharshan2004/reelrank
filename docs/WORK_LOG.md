@@ -123,3 +123,14 @@ All intervals cross zero. These exploratory point estimates do **not** establish
 ## Local commit execution — 2026-11-01
 
 The user subsequently authorized the four planned local commits, explicitly prohibiting a push and Codex contributor attribution. Commits use the configured Dharshan2004 identity with no co-author trailers. Isolated staged snapshots passed 27 tests for phase 1 and 29 for phase 2. Existing history, including the initial Cursor Agent author, remains unchanged.
+
+## Retrieval seed sweep — 2026-11-01
+
+- Added an independent `--cohort-seed` to retrieval training and checksummed per-user recall evidence to neural and baseline evaluation.
+- Added a runner with predeclared seeds 42–46, fixed eight-epoch settings, isolated artifact/result roots, an exact seed-42 reproduction gate, and before/after protection of the original top-level artifacts/results. No serving model replacement or hyperparameter tuning occurred.
+- All five runs completed: Recall@200 0.069556, 0.065714, 0.064123, 0.066361, 0.067564; mean 0.066664, sample SD 0.002039. Popularity 0.058418; ItemCF 0.053501.
+- Mean relative lifts: +14.11% versus popularity, +24.60% versus ItemCF. Seed-averaged paired user-bootstrap absolute-difference intervals: [0.000924, 0.015759] and [0.005487, 0.020763]. Three individual-seed intervals versus popularity cross zero; all five versus ItemCF exclude zero. These are conditional user intervals, not full training uncertainty.
+- Updated the README with one sourced results table, analytical uniform-random reference, seed variation, interval scope and unchanged end-to-end limitations. Preserved clearly labeled historical audits and run records instead of rewriting history.
+- Added integration coverage running two tiny training jobs with different training seeds, a fixed cohort, separate output roots and verified per-user evidence; added mismatched-pair and tampered-evidence checks.
+- Source snapshots for the five full training runs match. The seed-42 rerun reproduces the prior recall exactly; the integrity record confirms protected files were unchanged. No paid API calls or remote training services used.
+- Final verification: 33 tests passed and the synthetic example ran; all 22 original artifact files remain byte-identical. README/documentation links and the exact seed-42 reproduction gate were checked. Changes are recorded as local implementation and results/documentation commits on `codex/retrieval-seed-sweep`, with the configured user identity and no co-author trailers; nothing pushed.

@@ -1,0 +1,93 @@
+{
+  "config": {
+    "index": "flat_vs_hnsw"
+  },
+  "config_hash": "1b3cb5440b17",
+  "created_at": "2026-11-01T14:47:45Z",
+  "git_sha": "6633d167c80710a1a53e409f8bdfd71feb771179",
+  "metrics": {
+    "flat": {
+      "batch_mean_ms": 0.04586888800258748,
+      "mean_ms": 0.04830599959859683,
+      "p50_ms": 0.04831250407733023,
+      "p99_ms": 0.06034070189343762
+    },
+    "hnsw": {
+      "batch_mean_ms": 0.030706472006083157,
+      "mean_ms": 0.032195312769545126,
+      "p50_ms": 0.031145500543061644,
+      "p99_ms": 0.05091346261906433
+    },
+    "hnsw_recall_vs_flat": 0.9914000000000001,
+    "k": 100,
+    "n_items": 7583,
+    "n_queries": 500
+  },
+  "provenance": {
+    "dirty_worktree": true,
+    "input_files": {
+      "artifacts/retrieval_seed_sweep/seed45/index_flat.faiss": "e416b698673c2d5f133cc6e8d6781321a0af9af3986678e9d4e3ed31980265dd",
+      "artifacts/retrieval_seed_sweep/seed45/index_hnsw.faiss": "6e98e0f9622bf2c736b1a69e4499d824a13184cfb590a21e47cbbd340fa2254b",
+      "artifacts/retrieval_seed_sweep/seed45/item_embedding_ids.json": "ac178508f0eaa6a8b8627294a17006f15f544a0f5f2bc0ad4faaa6d90945251f",
+      "artifacts/retrieval_seed_sweep/seed45/item_embeddings.npy": "d53e9404486ec1db4e5387dfc5fe3c2e8e7ae89f32064cb7576536feb40592c8",
+      "artifacts/retrieval_seed_sweep/seed45/two_tower.pt": "28cdc9bf48609c465111566ed51b1d780cb5cf7e6767d5dd92e13f6d5fd80082",
+      "data/processed/histories.json": "6865ab45c0a7e2a8e6f32fd03c944f294b677308de73cf5ab2f40afaede8dfca",
+      "data/processed/id_maps.json": "328a70290eb671da86592f70ad292afe58ee5a2e9df8c45ccba56ec5f4727446",
+      "data/processed/interactions_standard_all.parquet": "5619197c5dd52f3fac92354b4000546490cbebc45258d750eef094fc35898f5b",
+      "data/processed/interactions_test_random.parquet": "877984454f23d6e3a14c46092575ab29f372e1879d7e2b88d2611c66bbe0e826",
+      "data/processed/interactions_test_std.parquet": "c0db0ade145b6c177b966b9200c97c2ed27fc858317bf0b7050fcd23483aa50b",
+      "data/processed/interactions_train.parquet": "8a28d3c4aeda1cc37284ec6c8a85ef48a05a985baf8af29fbe28aa311a0962bf",
+      "data/processed/interactions_val.parquet": "84082d37701aea9312605fc8822042a231ff55f7e04f861332bb3083531dd238",
+      "data/processed/split_summary.json": "c4f59c5070b938c687553fd3922dfaeabb7b79336f7ee317a5012a48873bd0fd",
+      "data/processed/users.parquet": "eb1fc04fef0cbbc911d4ab11b78c6a144c2b000999a1ba7937e05e5bb430b03e",
+      "data/processed/videos.parquet": "646930fd78ef579622eddf4c6902196e83facc076758cecb736a4a9671c39c11"
+    },
+    "source_files": {
+      "Makefile": "b85b67d761372fc280337fb33c07ed1aeb7ccde72ad0c03a1b2d322bc59eaad7",
+      "pyproject.toml": "0bf9c701a9e54092f65915efcd3de3fabef495603e57840f1fa74a4fe90bf0ab",
+      "reelrank/__init__.py": "46b99ec74bd99e25d6b0d4fceedf6371e323f16dbf4ae41ecd686eaaa443b859",
+      "reelrank/data/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reelrank/data/download.py": "e3929902256bef3bd91fb96852a624499d523aa9ef68a8bb365baf6bef35f2ef",
+      "reelrank/data/features.py": "050d121cf17221e51d39b5170e7c0203b22c62e1f0b44d7eb27dc20d2890a8c1",
+      "reelrank/data/history.py": "335456fd6e57a08e539da15c83e08403d035e9cda7dab6d479db3e69067275d5",
+      "reelrank/data/paths.py": "8df406c99a0d2e0c0c29323300eaf2da591b803c488bc03e93876b87c58f264c",
+      "reelrank/data/split.py": "020eec8577c7b466b7f87df4855aa4a2d451680ac22f38b128fe5deb48e48331",
+      "reelrank/eval/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reelrank/eval/make_readme_table.py": "00ea9e469c474b97ac2d1f4dfcf791c77f9c9f7b7d8f21108af5c92b6687ee3c",
+      "reelrank/eval/metrics.py": "e9d8b20d7246f84dbdd53be4596462813d3f76497181d1b50b565a10262e9bd3",
+      "reelrank/eval/pipeline_eval.py": "fa467acdea6e6120da25e6e54a6cb5c346c8121d7e782d740e16026e564bafc2",
+      "reelrank/eval/runlog.py": "d68298df39f48b26eff6e687eea230e342ac66a400fff57c93adf9edcd9563af",
+      "reelrank/eval/seed_summary.py": "3806a6a676c0ca5f079db6e97bc8ab0fc642065df5fc62f814b55ba2bc778478",
+      "reelrank/eval/seed_sweep.py": "b268c501e536fc28f2d93944086651e5c3ce3d4a4a0367954c3c5de2be40a6a7",
+      "reelrank/ranking/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reelrank/ranking/features.py": "e9bd1e84bb2d04607493d70f26d569e19545c5d19a3ce16792060146525f088e",
+      "reelrank/ranking/fusion.py": "34b074d40431cdc881ad8174c01cea8212c9109b53d1a83d3ef3f75fd679ccff",
+      "reelrank/ranking/inference.py": "75758d702c1089a9b2f2f220e0ec7365d63d45131b110eb0541a04d541981fdc",
+      "reelrank/ranking/models.py": "82085c2a3a6ec0239b0f6fe9140b278a65fde5832a8375f13d3afa870f4f589b",
+      "reelrank/ranking/train.py": "4989bd53a3ac68fa0f06a7771d74cc61895c5172a0e4ef51a6fe27ec8fd93fcf",
+      "reelrank/retrieval/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reelrank/retrieval/baselines.py": "38f61e64b4429a53807c14594d47600d70d489f4852d7605d9251ce91da7f529",
+      "reelrank/retrieval/eval_artifacts.py": "17f3bde0aa882621b9492fd05c99a5a27bcc56c084eac43424fc1a2f50234552",
+      "reelrank/retrieval/index.py": "0b225ed8fa6140ed6ce0a3c0a815f707cafcd4387d25b314906b16c4ffd1458d",
+      "reelrank/retrieval/train.py": "0533c82c45e7a0ba148e546ddbbc3e3760e04348a540c2a7439e87cff697549b",
+      "reelrank/retrieval/two_tower.py": "7152c262b488e5b478c58df63c973c2f8ae1423a7860297a0d465b13d6e52220",
+      "reelrank/safety/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reelrank/safety/cascade.py": "9bd7fe84e8c5a3a87a49b8ef6b522fa21765f78b4ec08bb3588aab7015b77ddc",
+      "reelrank/safety/classifier.py": "21e32e6166fac016601b52fc417971dea10fe7568947b8e7045e6234cda73ac6",
+      "reelrank/safety/judge.py": "8edecb24d86d63f3f6e656179b4d03359f9eaf6c9c4dda26251c60ab91a4a949",
+      "reelrank/safety/kappa.py": "63e729d80db92c52b1c077631c37bb2713cc60ebc4f6ec05e302278231035575",
+      "reelrank/safety/rules.py": "238b9c8f23aa6773903987bc24d81ce39a924be0814c2dc2602ac02d7169aa3c",
+      "reelrank/serve/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reelrank/serve/app.py": "c5a6cbcd8a81b1c314c62caaf9911fd9f9d5583dcca6b4d4f86d5efe21dcac4c",
+      "reelrank/serve/loadtest.py": "ede321e15c38684ecd0e4d1f6181e163a93cf201e49a7194ef7f2d7a8abffabf",
+      "reelrank/serve/locustfile.py": "11f617d1f90cca8b26ae494bf04aec7c6b4629aee8daa4e034d97ad18d717abf",
+      "reelrank/serve/validation.py": "de9e668928a32f1f7f1c701dbfe7c38aee587ca6e6302d292798d72b776bf41b",
+      "uv.lock": "e7b40a0af779e60639425f6d7e5bcd63703a40567c456f546abf021a527fbdc2"
+    },
+    "source_hash": "a64cdd9a95b3"
+  },
+  "record_path": "results/retrieval_seed_sweep/seed45/runs/20261101T144746Z-retrieval_faiss-a59f37ce/result.json",
+  "run_id": "retrieval_faiss",
+  "seed": 45,
+  "stage": "ann"
+}

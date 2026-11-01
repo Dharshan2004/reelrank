@@ -13,6 +13,7 @@
 | `retrieval_faiss` | ann  | hnsw_recall_vs_flat=0.9918, k=100, n_items=7583, n_queries=500, flat.batch_mean_ms=0.0779106940026395, flat.mean_ms=0.09999670373872505, flat.p50_ms=0.08233349944930524, flat.p99_ms=0.3940452150709455 |
 | `retrieval_itemcf` | retrieval  | coverage=0.8820, hit_rate@10=0.0075, hit_rate@200=0.2220, hit_rate@50=0.0660, recall@10=0.0014, recall@200=0.0535 |
 | `retrieval_popularity` | retrieval  | coverage=0.0264, hit_rate@10=0.0185, hit_rate@200=0.2395, hit_rate@50=0.0875, recall@10=0.0038, recall@200=0.0584 |
+| `retrieval_seed_sweep` | retrieval_seed_sweep  | recall@200_mean=0.0667, recall@200_sample_sd=0.0020, popularity_relative_lift_pct=14.1148, popularity_paired_ci95=[0.0009239464983030143, 0.015758752437809307], itemcf_relative_lift_pct=24.6023, itemcf_paired_ci95=[0.005486882476418669, 0.020762915410663003] |
 | `retrieval_two_tower` | retrieval  | coverage=0.3406, hit_rate@10=0.0240, hit_rate@200=0.2560, hit_rate@50=0.0885, recall@10=0.0042, recall@200=0.0696 |
 | `safety_cascade` | safety  | blocked_classifier=112, blocked_rules=12, labeled_precision_proxy=0.7705, n_videos=7583, pct_to_llm=0.1718, uncertain_band_to_llm=1303, thresholds.high=0.7, thresholds.low=0.3 |
 | `safety_classifier` | safety  | auc=0.6511, corr_safety_score_vs_hate_rate=-0.0223, f1=0.1081, n_test=375, n_train=1125, precision=0.0952 |

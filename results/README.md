@@ -4,6 +4,7 @@ Start with [RESULTS_TABLE.md](RESULTS_TABLE.md) and the [evaluation protocol](..
 
 | Files | Interpretation |
 |---|---|
+| `retrieval_seed_sweep.json`, `retrieval_seed_sweep/SUMMARY.md` | Five-seed retrieval mean, sample SD, per-seed and seed-averaged paired intervals |
 | `retrieval_two_tower.json`, `retrieval_popularity.json`, `retrieval_itemcf.json` | Matched 2,000-user retrieval comparison |
 | `ranking_*_validation.json` | Standard-validation model comparison |
 | `ranking_lr.json`, `ranking_deepfm.json`, `ranking_mmoe.json` | Exploratory random-exposure evaluation |

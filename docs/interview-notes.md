@@ -10,3 +10,9 @@ The useful story is the investigation: a complex model initially lacked user inp
 - Tensor caching avoids per-example pandas lookups during retrieval training.
 - Shared scoring and safety code prevent offline/API behavior drift. Tests cover LR/MMoE parity, unknown users, chronology, feature serialization, duplicate negatives and invalid responses.
 - Each new result keeps an immutable `results/runs/<timestamp>-<run>/` record, source snapshot, configuration, source/data/model hashes and per-user cascade outputs. Top-level JSON files are latest-result aliases.
+
+## Retrieval stability follow-up
+
+Five predeclared training seeds produced Recall@200 0.06666 ± 0.00204 (sample SD), versus popularity 0.05842 and ItemCF 0.05350 on the same 2,000 users. The seed-averaged user-bootstrap differences exclude zero; three of five individual-seed intervals versus popularity cross zero. This supports an exploratory retrieval improvement across the measured runs, not a guaranteed gain for new training seeds or an end-to-end/online result. No best seed was selected.
+
+Suggested résumé bullet: “Evaluated two-tower retrieval across five training seeds on a fixed 2,000-user cohort, achieving mean Recall@200 of 0.0667 ± 0.0020 versus 0.0584 for popularity.” Here ± is sample standard deviation, not a confidence interval.

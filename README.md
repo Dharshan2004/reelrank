@@ -29,13 +29,29 @@ The example fits a tiny ranker on synthetic interactions, filters a candidate li
 
 ## Results
 
-The authoritative current records are [the generated table](results/RESULTS_TABLE.md), [the executed analysis notebook](notebooks/analysis.ipynb), and [the work log](docs/WORK_LOG.md). Earlier audit reports preserve historical failures and results; they are not the latest scorecard.
+| Stage | Model / measurement | Result |
+|---|---|---|
+| Retrieval | Popularity | Recall@200 0.05842 |
+| Retrieval | ItemCF | Recall@200 0.05350 |
+| Retrieval | Two-tower, five training seeds | Recall@200 **0.06666 ± 0.00204** (sample SD) |
+| Retrieval comparison | Seed-mean two-tower minus popularity | +14.1% relative; paired absolute-difference 95% CI [0.00092, 0.01576] |
+| Retrieval comparison | Seed-mean two-tower minus itemcf | +24.6% relative; paired absolute-difference 95% CI [0.00549, 0.02076] |
+| Ranking | LR long-view GAUC | 0.64845 validation / 0.59627 random-exposure |
+| Ranking | DEEPFM long-view GAUC | 0.64390 validation / 0.59893 random-exposure |
+| Ranking | MMOE long-view GAUC | 0.61726 validation / 0.58518 random-exposure |
+| Serving | Original seed-42 bundle; 8 clients, 60 seconds, macOS ARM | 48.36 QPS; p50 31 ms / p99 100 ms; 0 failures / 2,890 requests |
+| FAISS | FLAT, original index benchmark | p50 0.082 ms / p99 0.394 ms |
+| FAISS | HNSW, original index benchmark | p50 0.056 ms / p99 0.171 ms |
 
-- Corrected two-tower Recall@200: **0.06956**, versus popularity **0.05842** and ItemCF **0.05350** on a matched cohort. These are single-seed point estimates.
-- Standard-validation long-view GAUC: **LR 0.64845**, DeepFM **0.64390**, MMoE **0.61726**. This supports the simpler default. MMoE is an evaluated experiment, not a claimed architecture win.
-- Exact FAISS is the default at this candidate-pool size. HNSW remains a benchmark, not an assumed speed improvement.
-- LR cascade with safety: NDCG@10 **0.003587** versus popularity→LR **0.002790**, a **+28.5% exploratory point estimate**. The paired absolute-difference interval **[-0.000265, +0.001892] crosses zero**; this does not establish reliable superiority.
-- Recorded 60-second serving run: **2,890 requests, zero failures, 48.36 QPS, p99 100 ms**, eight clients on macOS ARM with think time. This is achieved throughput, not capacity.
+Retrieval uses the same 2,000-user cohort for all seeds and both baselines. The intervals bootstrap **seed-averaged per-user recall differences**, conditional on these five fitted models; they do not cover all training uncertainty. All five point estimates exceed both baselines, but three of five per-seed intervals versus popularity cross zero (all five versus ItemCF exclude zero). Per-seed intervals and results are in the [sweep summary](results/retrieval_seed_sweep/SUMMARY.md). The current serving bundle remains seed 42 (Recall@200 0.06956); no best-seed selection was performed.
+
+The random log sparsely observes outcomes in a 7,583-item candidate pool. Unobserved user–item outcomes are unknown; Recall@200 measures recovery of observed long-view positives, not complete user relevance. A uniformly sampled set of 200 distinct candidates has theoretical expected recall `200 / 7,583 ≈ 0.0264`; this is an analytical reference, not a measured run. Compare models under the same evaluation contract, without treating sparsity as an explanation for every shortfall.
+
+**End-to-end uncertainty remains:** the original LR cascade with safety scored NDCG@10 0.003587 versus 0.002790 for popularity→LR (+28.5% point estimate), but the paired absolute-difference interval [-0.000265, +0.001892] crosses zero. The retrieval sweep does not establish a cascade or online improvement.
+
+LR remains the serving default because it had the highest standard-validation long-view GAUC. Exact FAISS remains the default at this small pool size. The ANN timings above came from a local run during concurrent training, not an isolated performance study; HNSW recall versus Flat was 0.99182. Serving QPS includes think time and is achieved throughput, not capacity.
+
+Sources: [sweep JSON](results/retrieval_seed_sweep.json), [complete results index](results/README.md), [generated table](results/RESULTS_TABLE.md), and [evaluation limitations](docs/evaluation.md). The existing [analysis notebook](notebooks/analysis.ipynb) covers the original single-seed evaluation; the sweep summary is the multi-seed record.
 
 ## Reproduce the experiment
 
@@ -96,6 +112,7 @@ The image excludes datasets, model artifacts, and experiment archives. `REELRANK
 ## Further reading
 
 - [Evaluation protocol and limitations](docs/evaluation.md)
+- [Seed-sweep protocol and reproduction](docs/seed-sweep.md)
 - [Results and provenance](results/README.md)
 - [Implementation work log](docs/WORK_LOG.md)
 - [Interview discussion notes](docs/interview-notes.md)
