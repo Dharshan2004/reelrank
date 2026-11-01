@@ -20,7 +20,7 @@ from tqdm import tqdm
 from reelrank.data.paths import ARTIFACTS, PROCESSED
 from reelrank.data.history import TimestampHistory
 from reelrank.eval.runlog import write_result
-from reelrank.retrieval.baselines import build_user_positives, evaluate_retrieval, evaluation_cohort
+from reelrank.retrieval.baselines import build_user_positives, evaluate_retrieval, evaluation_cohort, per_user_evidence
 from reelrank.retrieval.index import build_and_benchmark
 from reelrank.retrieval.two_tower import TwoTower, sampled_softmax_loss
 
@@ -162,6 +162,7 @@ def train_two_tower(
     seed: int = 42,
     max_eval_users: int = 2000,
     label: str = "long_view",
+    cohort_seed: int = 42,
 ) -> None:
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -286,7 +287,7 @@ def train_two_tower(
 
     test = pd.read_parquet(PROCESSED / "interactions_test_random.parquet")
     user_rel = build_user_positives(test, label="long_view")
-    user_rel = evaluation_cohort(user_rel, max_eval_users, seed)
+    user_rel = evaluation_cohort(user_rel, max_eval_users, cohort_seed)
     users = list(user_rel)
 
     # Encode users and search
@@ -313,12 +314,16 @@ def train_two_tower(
             user_recs[uid] = [int(id_list[j]) for j in idxs[0] if j >= 0]
 
     metrics = evaluate_retrieval(user_rel, user_recs, catalogue_size=len(video_ids))
+    evidence, extra = per_user_evidence(user_rel, user_recs, video_ids, "retrieval_two_tower")
     write_result(
         "retrieval_two_tower",
         "retrieval",
         metrics,
         config={
             "method": "two_tower",
+            "lr": lr,
+            "cohort_seed": cohort_seed,
+            **evidence,
             "epochs": epochs,
             "batch_size": batch_size,
             "emb_dim": emb_dim,
@@ -329,7 +334,7 @@ def train_two_tower(
             "seen_item_policy": "allow_repeats",
             "training_history": "strictly_earlier_timestamp",
         },
-        seed=seed,
+        seed=seed, extra=extra,
     )
     print("two_tower", metrics)
 
@@ -342,6 +347,7 @@ def main() -> None:
     parser.add_argument("--emb-dim", type=int, default=64)
     parser.add_argument("--temperature", type=float, default=0.05)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--cohort-seed", type=int, default=42)
     parser.add_argument("--max-eval-users", type=int, default=2000)
     parser.add_argument("--label", choices=["long_view", "is_click"], default="long_view")
     args = parser.parse_args()
@@ -354,6 +360,7 @@ def main() -> None:
         seed=args.seed,
         max_eval_users=args.max_eval_users,
         label=args.label,
+        cohort_seed=args.cohort_seed,
     )
 
 

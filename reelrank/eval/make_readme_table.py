@@ -16,6 +16,17 @@ def main() -> None:
             continue
         data = json.loads(path.read_text())
         metrics = data.get("metrics", {})
+        if data.get("stage") == "retrieval_seed_sweep":
+            # Keep the summary compact; full per-seed intervals live in its JSON.
+            comparisons = metrics["comparisons"]
+            metrics = {
+                "recall@200_mean": metrics["recall@200_mean"],
+                "recall@200_sample_sd": metrics["recall@200_std"],
+                "popularity_relative_lift_pct": comparisons["popularity"]["relative_lift_of_seed_mean_pct"],
+                "popularity_paired_ci95": comparisons["popularity"]["seed_averaged_user_difference_ci95"],
+                "itemcf_relative_lift_pct": comparisons["itemcf"]["relative_lift_of_seed_mean_pct"],
+                "itemcf_paired_ci95": comparisons["itemcf"]["seed_averaged_user_difference_ci95"],
+            }
         # Put the primary task before auxiliary click/like metrics.
         if data.get("stage") == "ranking":
             metrics = {k: metrics[k] for k in ["long_view", "is_click", "is_like", "fusion"] if k in metrics}
