@@ -1,6 +1,6 @@
 # ReelRank
 
-An end-to-end short-video recommender (TikTok For You–style) built on KuaiRand, judged primarily on an unbiased random-exposure test set.
+An end-to-end short-video recommender prototype built on KuaiRand, with standard-validation selection and exploratory evaluation on random-exposure logs.
 
 ## Language
 
@@ -17,7 +17,7 @@ A stage after retrieval that removes or down-ranks captions that violate a conte
 _Avoid_: moderation (broader product process), censor
 
 **Ranking**:
-The stage that scores filtered candidates for engagement and orders the final top-k feed (here: MMoE predicts click / long_view / like, then fusion → top-10).
+The stage that scores filtered candidates for engagement and orders the final top-k feed. LR long-view scoring is the serving default; MMoE predicts click / long_view / like for a multi-task experiment.
 _Avoid_: sorting, re-ranking (unless a later second ranker is added), weighted sum (that is fusion only)
 
 **Fusion**:
@@ -29,7 +29,7 @@ The ordered serving pipeline: retrieval → safety filter → ranking → top-k.
 _Avoid_: pipeline (too generic), funnel
 
 **Random-exposure log**:
-A historical log where the platform showed videos to users at random. Used as the primary **offline evaluation** set because it is not biased by a previous recommender policy.
+A historical log where the platform showed videos to users at random. It helps assess exposure-policy bias but still has missing user-item outcomes. Current use is exploratory: older project versions used it for model selection.
 _Avoid_: online experiment, A/B test, test log, training set
 
 **Standard log**:
@@ -41,5 +41,5 @@ A binary user feedback signal on an impression — in this project: `is_click`, 
 _Avoid_: reward, CTR (too narrow), interaction (too vague), interaction parameter
 
 **Lift vs popularity**:
-The relative improvement of the full cascade’s primary metric over a popularity→same-ranker baseline on the same eval set; the honest performance claim when absolute NDCG is tiny.
+The relative change of the full cascade’s primary metric over a popularity→same-ranker baseline on the same cohort and safety policy. Report absolute values and paired uncertainty alongside lift; a positive point estimate alone does not establish a reliable improvement.
 _Avoid_: accuracy, absolute NDCG (as the headline claim)

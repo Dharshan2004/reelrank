@@ -1,0 +1,9 @@
+**
+!pyproject.toml
+!uv.lock
+!README.md
+!LICENSE
+!reelrank/
+!reelrank/**
+reelrank/**/__pycache__/
+reelrank/**/*.pyc
