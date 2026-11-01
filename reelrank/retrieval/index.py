@@ -21,15 +21,12 @@ def build_and_benchmark(
     xb = np.ascontiguousarray(embeddings.astype(np.float32))
     d = xb.shape[1]
 
+    # Single-thread FAISS on macOS tends to avoid rare native segfaults during HNSW build.
+    faiss.omp_set_num_threads(1)
+
     flat = faiss.IndexFlatIP(d)
     flat.add(xb)
     faiss.write_index(flat, str(ARTIFACTS / "index_flat.faiss"))
-
-    hnsw = faiss.IndexHNSWFlat(d, 32, faiss.METRIC_INNER_PRODUCT)
-    hnsw.hnsw.efConstruction = 200
-    hnsw.add(xb)
-    hnsw.hnsw.efSearch = 64
-    faiss.write_index(hnsw, str(ARTIFACTS / "index_hnsw.faiss"))
 
     rng = np.random.default_rng(seed)
     q_idx = rng.choice(len(xb), size=min(n_queries, len(xb)), replace=False)
@@ -44,12 +41,12 @@ def build_and_benchmark(
             index.search(xq, k)
             times.append((time.perf_counter() - t0) * 1000.0 / len(xq))
         arr = np.array(times)
-        # per-query ms approx
-        # recompute distribution on one pass
+        # Sample per-query latency (avoids a fragile full per-query loop on some FAISS builds).
+        sample = xq[: min(64, len(xq))]
         per = []
-        for i in range(len(xq)):
+        for i in range(len(sample)):
             t0 = time.perf_counter()
-            index.search(xq[i : i + 1], k)
+            index.search(sample[i : i + 1], k)
             per.append((time.perf_counter() - t0) * 1000.0)
         per_arr = np.array(per)
         return {
@@ -59,19 +56,29 @@ def build_and_benchmark(
             "batch_mean_ms": float(arr.mean()),
         }
 
-    _, hnsw_idx = hnsw.search(xq, k)
-    # recall vs exact
-    recalls = []
-    for i in range(len(xq)):
-        gt_set = set(gt[i].tolist())
-        hit = len(gt_set.intersection(set(hnsw_idx[i].tolist())))
-        recalls.append(hit / k)
-    metrics = {
-        "hnsw_recall_vs_flat": float(np.mean(recalls)),
+    metrics: dict[str, Any] = {
         "flat": _latency(flat),
-        "hnsw": _latency(hnsw),
         "n_items": int(len(xb)),
         "n_queries": int(len(xq)),
         "k": k,
     }
+
+    try:
+        hnsw = faiss.IndexHNSWFlat(d, 32, faiss.METRIC_INNER_PRODUCT)
+        hnsw.hnsw.efConstruction = 200
+        hnsw.add(xb)
+        hnsw.hnsw.efSearch = 64
+        faiss.write_index(hnsw, str(ARTIFACTS / "index_hnsw.faiss"))
+        _, hnsw_idx = hnsw.search(xq, k)
+        recalls = []
+        for i in range(len(xq)):
+            gt_set = set(gt[i].tolist())
+            hit = len(gt_set.intersection(set(hnsw_idx[i].tolist())))
+            recalls.append(hit / k)
+        metrics["hnsw_recall_vs_flat"] = float(np.mean(recalls))
+        metrics["hnsw"] = _latency(hnsw)
+    except Exception as exc:  # noqa: BLE001 - native FAISS failures vary by platform
+        metrics["hnsw_error"] = f"{type(exc).__name__}: {exc}"
+        metrics["hnsw_recall_vs_flat"] = float("nan")
+
     return metrics

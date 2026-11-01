@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,8 +16,7 @@ import torch
 from fastapi import FastAPI, HTTPException, Query
 
 from reelrank.data.paths import ARTIFACTS, PROCESSED
-from reelrank.ranking.fusion import fuse
-from reelrank.ranking.models import MMoE
+from reelrank.ranking.inference import filter_candidates, load_ranker_artifact, score_candidates
 from reelrank.retrieval.two_tower import TwoTower
 
 STATE: dict[str, Any] = {}
@@ -44,10 +44,7 @@ def _load() -> None:
     tt.load_state_dict(ckpt["state_dict"])
     tt.eval()
 
-    mmoe_ckpt = torch.load(ARTIFACTS / "mmoe.pt", map_location="cpu", weights_only=False)
-    ranker = MMoE(mmoe_ckpt["field_dims"], n_experts=mmoe_ckpt["n_experts"])
-    ranker.load_state_dict(mmoe_ckpt["state_dict"])
-    ranker.eval()
+    ranking = load_ranker_artifact(ARTIFACTS, os.environ.get("REELRANK_RANKER", "lr"))
 
     safety_path = ARTIFACTS / "video_safety_scores.parquet"
     safety = pd.read_parquet(safety_path).set_index("video_id") if safety_path.exists() else None
@@ -56,11 +53,8 @@ def _load() -> None:
         {
             "tt": tt,
             "meta": meta,
-            "ranker": ranker,
-            "field_cols": mmoe_ckpt["field_cols"],
-            "field_dims": mmoe_ckpt["field_dims"],
-            "fusion_w": tuple(mmoe_ckpt.get("fusion_weights", [0.3, 0.5, 0.2])),
-            "index": faiss.read_index(str(ARTIFACTS / "index_hnsw.faiss")),
+            "ranking": ranking,
+            "index": faiss.read_index(str(ARTIFACTS / "index_flat.faiss")),
             "item_ids": json.loads((ARTIFACTS / "item_embedding_ids.json").read_text()),
             "users_df": users_df,
             "videos_df": videos_df,
@@ -133,51 +127,18 @@ def recommend(
     # Safety
     t1 = time.perf_counter()
     safety = STATE["safety"]
-    filtered = []
-    blocked = 0
-    if safety is not None:
-        for vid in cands:
-            if vid in safety.index and (bool(safety.loc[vid]["rule_hit"]) or float(safety.loc[vid]["safety_score"]) >= 0.5):
-                blocked += 1
-                continue
-            filtered.append(vid)
-    else:
-        filtered = cands
+    filtered = filter_candidates(cands, safety)
+    blocked = len(cands) - len(filtered)
     timings["safety_ms"] = (time.perf_counter() - t1) * 1000
 
     # Rank
     t2 = time.perf_counter()
     videos_df = STATE["videos_df"]
-    field_cols = STATE["field_cols"]
-    rows = []
     keep_ids = filtered[:retrieve_k]
-    for vid in keep_ids:
-        feats = []
-        urow = users_df.loc[uid] if uid in users_df.index else None
-        if isinstance(urow, pd.DataFrame):
-            urow = urow.iloc[0]
-        vrow = videos_df.loc[vid] if vid in videos_df.index else None
-        dims = STATE["field_dims"]
-        for i, c in enumerate(field_cols):
-            if c == "log_dur_bin":
-                v = int(min(10, np.log1p(float(vrow.get("video_duration", 0) or 0)))) + 1 if vrow is not None else 0
-            elif c == "log_pop_bin":
-                v = int(min(10, np.log1p(float(vrow.get("pop_clicks", 0) or 0)))) + 1 if vrow is not None else 0
-            elif urow is not None and c in urow.index:
-                v = int(urow.get(c, 0) or 0)
-            elif vrow is not None and c in vrow.index:
-                v = int(vrow.get(c, 0) or 0)
-            else:
-                v = 0
-            feats.append(int(np.clip(v, 0, dims[i])))
-        rows.append(feats)
     items = []
-    if rows:
-        x = torch.tensor(np.array(rows, dtype=np.int64), dtype=torch.long)
-        with torch.no_grad():
-            proba = torch.sigmoid(STATE["ranker"](x)).numpy()
-        scores = fuse(proba, STATE["fusion_w"])
-        order = np.argsort(-scores)[:k]
+    if keep_ids:
+        proba, scores = score_candidates(STATE["ranking"], uid, keep_ids, users_df, videos_df)
+        order = np.argsort(-scores, kind="stable")[:k]
         for i in order:
             vid = keep_ids[i]
             cap = ""
@@ -198,6 +159,7 @@ def recommend(
 
     return {
         "user_id": uid,
+        "ranker": STATE["ranking"].name,
         "items": items,
         "timings_ms": timings,
         "diagnostics": {

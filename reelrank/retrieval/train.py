@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+
+# Avoid Torch+FAISS OpenMP double-init crashes on macOS (seen as make Error 139).
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
 
 import numpy as np
 import pandas as pd
@@ -13,8 +18,9 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 from reelrank.data.paths import ARTIFACTS, PROCESSED
+from reelrank.data.history import TimestampHistory
 from reelrank.eval.runlog import write_result
-from reelrank.retrieval.baselines import build_user_positives, evaluate_retrieval
+from reelrank.retrieval.baselines import build_user_positives, evaluate_retrieval, evaluation_cohort
 from reelrank.retrieval.index import build_and_benchmark
 from reelrank.retrieval.two_tower import TwoTower, sampled_softmax_loss
 
@@ -32,7 +38,8 @@ class InteractionDataset(Dataset):
         video_cat_cols: list[str],
         user_num_cols: list[str],
         history_n: int,
-        label: str = "is_click",
+        label: str = "long_view",
+        training: bool = True,
     ) -> None:
         pos = df[df[label] == 1].reset_index(drop=True)
         self.df = pos
@@ -45,11 +52,39 @@ class InteractionDataset(Dataset):
         self.video_cat_cols = video_cat_cols
         self.user_num_cols = user_num_cols
         self.history_n = history_n
+        self.training_history = TimestampHistory(df, video_id_map, history_n) if training else None
+        # Materialize entity features once instead of doing pandas .loc for
+        # every training example in every epoch. Histories remain per-example.
+        self._uids = self.df["user_id"].to_numpy(dtype=np.int64)
+        self._vids = self.df["video_id"].to_numpy(dtype=np.int64)
+        self._user_cache = {}
+        for uid in np.unique(self._uids):
+            cat, num, _ = self._user_feats(int(uid))
+            self._user_cache[int(uid)] = (
+                torch.tensor(user_id_map.get(str(uid), user_id_map.get(int(uid), 0)), dtype=torch.long),
+                torch.from_numpy(cat), torch.from_numpy(num),
+            )
+        self._item_cache = {}
+        for vid in np.unique(self._vids):
+            cat, num = self._item_feats(int(vid))
+            self._item_cache[int(vid)] = (
+                torch.tensor(video_id_map.get(str(vid), video_id_map.get(int(vid), 0)), dtype=torch.long),
+                torch.from_numpy(cat), torch.from_numpy(num),
+            )
+        history_rows = np.zeros((len(self.df), history_n), dtype=np.int64)
+        for uid, rows in self.df.groupby("user_id", sort=False).indices.items():
+            if self.training_history is not None:
+                history_rows[rows] = self.training_history.before_many(
+                    int(uid), self.df.iloc[rows]["time_ms"].to_numpy()
+                )
+            else:
+                history_rows[rows] = self._user_feats(int(uid))[2]
+        self._history_rows = torch.from_numpy(history_rows)
 
     def __len__(self) -> int:
         return len(self.df)
 
-    def _user_feats(self, uid: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _user_feats(self, uid: int, timestamp: int | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         if uid not in self.users.index:
             cat = np.zeros(max(len(self.user_cat_cols), 1), dtype=np.int64)
             num = np.zeros(max(len(self.user_num_cols), 1), dtype=np.float32)
@@ -67,6 +102,11 @@ class InteractionDataset(Dataset):
                 if self.user_num_cols
                 else np.zeros(1, dtype=np.float32)
             )
+        if timestamp is not None:
+            if self.training_history is None:
+                raise ValueError("Point-in-time histories require training=True")
+            return cat, num, self.training_history.before(uid, timestamp)
+        # No timestamp is used only for inference after the training window.
         hist = self.histories.get(str(uid), self.histories.get(uid, []))
         hist_arr = np.zeros(self.history_n, dtype=np.int64)
         if hist:
@@ -93,21 +133,16 @@ class InteractionDataset(Dataset):
         return cat, num
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
-        row = self.df.iloc[idx]
-        uid = int(row["user_id"])
-        vid = int(row["video_id"])
-        user_cat, user_num, hist = self._user_feats(uid)
-        video_cat, video_num = self._item_feats(vid)
+        user_idx, user_cat, user_num = self._user_cache[int(self._uids[idx])]
+        video_idx, video_cat, video_num = self._item_cache[int(self._vids[idx])]
         return {
-            "user_idx": torch.tensor(self.user_id_map.get(str(uid), self.user_id_map.get(uid, 0)), dtype=torch.long),
-            "video_idx": torch.tensor(
-                self.video_id_map.get(str(vid), self.video_id_map.get(vid, 0)), dtype=torch.long
-            ),
-            "user_cat": torch.tensor(user_cat, dtype=torch.long),
-            "video_cat": torch.tensor(video_cat, dtype=torch.long),
-            "user_num": torch.tensor(user_num, dtype=torch.float32),
-            "video_num": torch.tensor(video_num, dtype=torch.float32),
-            "hist_idx": torch.tensor(hist, dtype=torch.long),
+            "user_idx": user_idx,
+            "video_idx": video_idx,
+            "user_cat": user_cat,
+            "video_cat": video_cat,
+            "user_num": user_num,
+            "video_num": video_num,
+            "hist_idx": self._history_rows[idx],
         }
 
 
@@ -125,7 +160,8 @@ def train_two_tower(
     emb_dim: int = 64,
     temperature: float = 0.05,
     seed: int = 42,
-    max_eval_users: int = 1500,
+    max_eval_users: int = 2000,
+    label: str = "long_view",
 ) -> None:
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -159,18 +195,22 @@ def train_two_tower(
         video_cat_cols,
         user_num_cols,
         meta["history_n"],
+        label=label,
     )
-    loader = DataLoader(ds, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+    if len(ds) == 0:
+        raise ValueError(f"No positive training events for {label}")
+    loader = DataLoader(ds, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=False)
 
     # item frequency for logQ
-    freqs = train_df[train_df["is_click"] == 1]["video_id"].map(
+    freqs = ds.df["video_id"].map(
         lambda x: video_id_map.get(str(x), video_id_map.get(x, 0))
     )
     freq_counts = np.bincount(freqs.dropna().astype(int), minlength=meta["n_videos"] + 1).astype(
         np.float32
     )
-    freq_counts = np.clip(freq_counts, 1.0, None)
-    logq_table = torch.tensor(np.log(freq_counts / freq_counts.sum()), dtype=torch.float32)
+    # Unseen items are never sampled; avoid smoothing their mass into q.
+    sampling_q = freq_counts / freq_counts.sum()
+    logq_table = torch.tensor(np.log(np.maximum(sampling_q, np.finfo(np.float32).tiny)), dtype=torch.float32)
 
     model = TwoTower(
         n_users=meta["n_users"],
@@ -190,7 +230,9 @@ def train_two_tower(
         for batch in tqdm(loader, desc=f"epoch {epoch+1}/{epochs}"):
             u, v = model(batch)
             logq = logq_table[batch["video_idx"]]
-            loss = sampled_softmax_loss(u, v, logq=logq, temperature=temperature)
+            loss = sampled_softmax_loss(
+                u, v, logq=logq, temperature=temperature, candidate_ids=batch["video_idx"]
+            )
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -208,6 +250,8 @@ def train_two_tower(
             "temperature": temperature,
             "n_user_cats": n_user_cats,
             "n_video_cats": n_video_cats,
+            "training_label": label,
+            "training_history": "strictly_earlier_timestamp",
         },
     }
     torch.save(ckpt, ARTIFACTS / "two_tower.pt")
@@ -242,11 +286,8 @@ def train_two_tower(
 
     test = pd.read_parquet(PROCESSED / "interactions_test_random.parquet")
     user_rel = build_user_positives(test, label="long_view")
-    rng = np.random.default_rng(seed)
-    users = sorted(user_rel.keys())
-    if len(users) > max_eval_users:
-        users = sorted(rng.choice(users, size=max_eval_users, replace=False).tolist())
-    user_rel = {u: user_rel[u] for u in users}
+    user_rel = evaluation_cohort(user_rel, max_eval_users, seed)
+    users = list(user_rel)
 
     # Encode users and search
     import faiss
@@ -283,6 +324,10 @@ def train_two_tower(
             "emb_dim": emb_dim,
             "temperature": temperature,
             "max_eval_users": max_eval_users,
+            "training_label": label,
+            "evaluation_label": "long_view",
+            "seen_item_policy": "allow_repeats",
+            "training_history": "strictly_earlier_timestamp",
         },
         seed=seed,
     )
@@ -290,15 +335,15 @@ def train_two_tower(
 
 
 def main() -> None:
-    # Fix syntax error risk - rewrite _item_feats carefully in file via search later if needed
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=3)
+    parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--batch-size", type=int, default=1024)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--emb-dim", type=int, default=64)
     parser.add_argument("--temperature", type=float, default=0.05)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--max-eval-users", type=int, default=1500)
+    parser.add_argument("--max-eval-users", type=int, default=2000)
+    parser.add_argument("--label", choices=["long_view", "is_click"], default="long_view")
     args = parser.parse_args()
     train_two_tower(
         epochs=args.epochs,
@@ -308,6 +353,7 @@ def main() -> None:
         temperature=args.temperature,
         seed=args.seed,
         max_eval_users=args.max_eval_users,
+        label=args.label,
     )
 
 

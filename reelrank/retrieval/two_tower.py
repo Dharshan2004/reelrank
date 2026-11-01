@@ -79,10 +79,23 @@ def sampled_softmax_loss(
     item_emb: torch.Tensor,
     logq: torch.Tensor | None = None,
     temperature: float = 0.05,
+    candidate_ids: torch.Tensor | None = None,
 ) -> torch.Tensor:
-    """In-batch sampled softmax with optional logQ correction."""
+    """In-batch softmax; mask repeated positive items used as negatives.
+
+    logq contains the log sampling probability of each candidate column. It
+    must match the positive-event distribution sampled by the data loader.
+    Other distinct items remain negatives, even if another event liked them.
+    """
     logits = (user_emb @ item_emb.T) / temperature
     if logq is not None:
         logits = logits - logq.unsqueeze(0)
     labels = torch.arange(user_emb.size(0), device=user_emb.device)
+    if candidate_ids is not None:
+        candidate_ids = candidate_ids.to(logits.device)
+        if candidate_ids.ndim != 1 or len(candidate_ids) != len(labels):
+            raise ValueError("candidate_ids must contain one ID per paired example")
+        accidental = candidate_ids[:, None] == candidate_ids[None, :]
+        accidental.fill_diagonal_(False)
+        logits = logits.masked_fill(accidental, float("-inf"))
     return F.cross_entropy(logits, labels)

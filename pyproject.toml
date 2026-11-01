@@ -3,6 +3,7 @@ name = "reelrank"
 version = "0.1.0"
 description = "Two-stage short-video recommender on KuaiRand-Pure"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
   "numpy>=1.26",
@@ -16,8 +17,10 @@ dependencies = [
   "pydantic>=2.5",
   "pyyaml>=6.0",
   "httpx>=0.26",
+  "locust>=2.24",
   "tqdm>=4.66",
   "scipy>=1.11",
+  "pillow>=13.0.0",
 ]
 
 [project.optional-dependencies]

@@ -1,4 +1,8 @@
-"""Simple async load test for /recommend."""
+"""Lightweight async httpx load test for /recommend.
+
+Prefer Locust for the default path (`make loadtest`). Keep this for a
+no-spawn, fixed-N smoke check: `make loadtest-httpx`.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +17,8 @@ import httpx
 import pandas as pd
 
 from reelrank.data.paths import ARTIFACTS, PROCESSED, RESULTS
+from reelrank.eval.runlog import write_result
+from reelrank.serve.validation import validate_recommendations
 
 
 async def run_load(base_url: str, n_requests: int = 200, concurrency: int = 8) -> dict:
@@ -30,6 +36,7 @@ async def run_load(base_url: str, n_requests: int = 200, concurrency: int = 8) -
                 try:
                     r = await client.get("/recommend", params={"user_id": uid, "k": 10})
                     r.raise_for_status()
+                    validate_recommendations(r.json())
                     latencies.append((time.perf_counter() - t0) * 1000)
                 except Exception:
                     errors += 1
@@ -59,8 +66,10 @@ async def run_load(base_url: str, n_requests: int = 200, concurrency: int = 8) -
             "python": platform.python_version(),
         },
     }
-    RESULTS.mkdir(parents=True, exist_ok=True)
-    (RESULTS / "serving_loadtest.json").write_text(json.dumps({"run_id": "serving_loadtest", "stage": "serving", "metrics": metrics}, indent=2))
+    write_result("serving_loadtest_httpx", "serving", metrics, config={
+        "n_requests": n_requests, "concurrency": concurrency, "tool": "httpx",
+        "response_validation": "nonempty_unique_finite_probabilities_and_timings",
+    })
     print(metrics)
     return metrics
 

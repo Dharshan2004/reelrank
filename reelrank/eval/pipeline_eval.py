@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import defaultdict
 
 import faiss
 import numpy as np
@@ -14,9 +13,8 @@ from tqdm import tqdm
 
 from reelrank.data.paths import ARTIFACTS, PROCESSED
 from reelrank.eval.metrics import catalogue_coverage, mean_metric, ndcg_at_k
-from reelrank.eval.runlog import write_result
-from reelrank.ranking.fusion import fuse
-from reelrank.ranking.models import MMoE
+from reelrank.eval.runlog import config_hash, write_result
+from reelrank.ranking.inference import SAFETY_THRESHOLD, filter_candidates, load_ranker_artifact, rank_candidates
 from reelrank.retrieval.baselines import build_user_positives, popularity_recommend
 from reelrank.retrieval.two_tower import TwoTower
 
@@ -64,12 +62,34 @@ def _user_batch(uid, meta, users_df, histories, user_id_map):
     }
 
 
+def paired_bootstrap(treatment: np.ndarray, baseline: np.ndarray, seed: int = 42, n_bootstrap: int = 2000) -> dict:
+    """Resample paired users, retaining shared user difficulty across methods."""
+    treatment = np.asarray(treatment, dtype=float)
+    baseline = np.asarray(baseline, dtype=float)
+    if treatment.shape != baseline.shape or treatment.ndim != 1 or not len(treatment):
+        raise ValueError("Bootstrap requires nonempty paired one-dimensional scores.")
+    rng = np.random.default_rng(seed)
+    differences, lifts = [], []
+    for _ in range(n_bootstrap):
+        sample = rng.integers(0, len(treatment), size=len(treatment))
+        a, b = treatment[sample].mean(), baseline[sample].mean()
+        differences.append(float(a - b))
+        if b > 0:
+            lifts.append(float(a / b - 1))
+    return {"n_resamples": n_bootstrap, "confidence_level": 0.95,
+            "mean_difference": float((treatment - baseline).mean()),
+            "difference_ci95": np.quantile(differences, [0.025, 0.975]).tolist(),
+            "relative_lift_ci95": np.quantile(lifts, [0.025, 0.975]).tolist() if len(lifts) == n_bootstrap else None,
+            "zero_baseline_resamples": n_bootstrap - len(lifts)}
+
+
 def run_pipeline(
-    max_users: int = 1000,
+    max_users: int = 2000,
     retrieve_k: int = 200,
     top_k: int = 10,
     apply_safety: bool = True,
     seed: int = 42,
+    ranker: str = "lr",
 ) -> dict:
     id_meta = json.loads((PROCESSED / "id_maps.json").read_text())
     histories = json.loads((PROCESSED / "histories.json").read_text())
@@ -83,16 +103,14 @@ def run_pipeline(
     item_ids = json.loads((ARTIFACTS / "item_embedding_ids.json").read_text())
     index = faiss.read_index(str(ARTIFACTS / "index_flat.faiss"))
 
-    mmoe_ckpt = torch.load(ARTIFACTS / "mmoe.pt", map_location="cpu", weights_only=False)
-    ranker = MMoE(mmoe_ckpt["field_dims"], n_experts=mmoe_ckpt["n_experts"])
-    ranker.load_state_dict(mmoe_ckpt["state_dict"])
-    ranker.eval()
-    field_cols = mmoe_ckpt["field_cols"]
-    fusion_w = tuple(mmoe_ckpt.get("fusion_weights", [0.3, 0.5, 0.2]))
+    ranking = load_ranker_artifact(ARTIFACTS, ranker)
 
     safety = None
-    if apply_safety and (ARTIFACTS / "video_safety_scores.parquet").exists():
-        safety = pd.read_parquet(ARTIFACTS / "video_safety_scores.parquet").set_index("video_id")
+    if apply_safety:
+        safety_path = ARTIFACTS / "video_safety_scores.parquet"
+        if not safety_path.exists():
+            raise FileNotFoundError("Safety-enabled evaluation requires video_safety_scores.parquet; run make train-safety or use --no-safety.")
+        safety = pd.read_parquet(safety_path).set_index("video_id")
 
     user_rel = build_user_positives(test, label="long_view")
     rng = np.random.default_rng(seed)
@@ -104,47 +122,6 @@ def run_pipeline(
     # Popularity floor -> same ranker
     pop_recs_raw = popularity_recommend(train, users, k=retrieve_k)
 
-    field_dims = mmoe_ckpt["field_dims"]
-
-    def rank_candidates(uid: int, cand_ids: list[int]) -> list[int]:
-        if not cand_ids:
-            return []
-        rows = []
-        for vid in cand_ids:
-            feats = {}
-            if uid in users_df.index:
-                urow = users_df.loc[uid]
-                if isinstance(urow, pd.DataFrame):
-                    urow = urow.iloc[0]
-            else:
-                urow = None
-            vrow = videos_df.loc[vid] if vid in videos_df.index else None
-            for c in field_cols:
-                if c in ("log_dur_bin", "log_pop_bin"):
-                    if vrow is None:
-                        feats[c] = 0
-                    elif c == "log_dur_bin":
-                        feats[c] = int(min(10, np.log1p(float(vrow.get("video_duration", 0) or 0)))) + 1
-                    else:
-                        feats[c] = int(min(10, np.log1p(float(vrow.get("pop_clicks", 0) or 0)))) + 1
-                elif urow is not None and c in urow.index:
-                    feats[c] = int(urow.get(c, 0) or 0)
-                elif vrow is not None and c in vrow.index:
-                    feats[c] = int(vrow.get(c, 0) or 0)
-                else:
-                    feats[c] = 0
-            # Clamp to embedding table sizes saved at train time
-            row = []
-            for i, c in enumerate(field_cols):
-                row.append(int(np.clip(feats[c], 0, field_dims[i])))
-            rows.append(row)
-        x = torch.tensor(np.array(rows, dtype=np.int64), dtype=torch.long)
-        with torch.no_grad():
-            proba = torch.sigmoid(ranker(x)).numpy()
-        scores = fuse(proba, fusion_w)
-        order = np.argsort(-scores)
-        return [cand_ids[i] for i in order[:top_k]]
-
     def retrieve(uid: int) -> list[int]:
         batch = _user_batch(uid, meta, users_df, histories, user_id_map)
         with torch.no_grad():
@@ -153,51 +130,70 @@ def run_pipeline(
             )
         _, idxs = index.search(uemb.cpu().numpy().astype(np.float32), retrieve_k)
         cands = [int(item_ids[j]) for j in idxs[0] if j >= 0]
-        if apply_safety and safety is not None:
-            filtered = []
-            for vid in cands:
-                if vid in safety.index:
-                    row = safety.loc[vid]
-                    if bool(row["rule_hit"]) or float(row["safety_score"]) >= 0.5:
-                        continue
-                filtered.append(vid)
-            cands = filtered
         return cands
 
     tt_recs = {}
     pop_ranked = {}
     for uid in tqdm(users, desc="pipeline"):
         cands = retrieve(uid)
-        tt_recs[uid] = rank_candidates(uid, cands)
-        pop_ranked[uid] = rank_candidates(uid, pop_recs_raw[uid][:retrieve_k])
+        tt_recs[uid] = rank_candidates(ranking, uid, filter_candidates(cands, safety), users_df, videos_df, top_k)
+        pop_ranked[uid] = rank_candidates(ranking, uid, filter_candidates(pop_recs_raw[uid][:retrieve_k], safety), users_df, videos_df, top_k)
 
     metrics = {
-        "ndcg@10_two_tower_mmoe": mean_metric(user_rel, tt_recs, top_k, ndcg_at_k),
-        "ndcg@10_popularity_mmoe": mean_metric(user_rel, pop_ranked, top_k, ndcg_at_k),
+        "ranker": ranking.name,
+        "ndcg@10_two_tower": mean_metric(user_rel, tt_recs, top_k, ndcg_at_k),
+        "ndcg@10_popularity": mean_metric(user_rel, pop_ranked, top_k, ndcg_at_k),
         "coverage_two_tower": catalogue_coverage(tt_recs.values(), catalogue_size=len(item_ids)),
         "apply_safety": apply_safety,
         "n_users": len(users),
         "retrieve_k": retrieve_k,
     }
-    if metrics["ndcg@10_popularity_mmoe"] > 0:
+    if metrics["ndcg@10_popularity"] > 0:
         metrics["lift_vs_pop"] = (
-            metrics["ndcg@10_two_tower_mmoe"] / metrics["ndcg@10_popularity_mmoe"] - 1.0
+            metrics["ndcg@10_two_tower"] / metrics["ndcg@10_popularity"] - 1.0
         )
-    run_id = "e2e_with_safety" if apply_safety else "e2e_no_safety"
-    write_result(run_id, "e2e", metrics, config={"retrieve_k": retrieve_k, "top_k": top_k}, seed=seed)
+    per_user = pd.DataFrame([
+        {"user_id": uid, "ndcg_two_tower": ndcg_at_k(user_rel[uid], tt_recs[uid], top_k),
+         "ndcg_popularity": ndcg_at_k(user_rel[uid], pop_ranked[uid], top_k),
+         "positive_hits_two_tower": len(set(user_rel[uid]) & set(tt_recs[uid])),
+         "positive_hits_popularity": len(set(user_rel[uid]) & set(pop_ranked[uid])),
+         "n_relevant": len(set(user_rel[uid])),
+         "recommendations_two_tower": tt_recs[uid], "recommendations_popularity": pop_ranked[uid]}
+        for uid in users
+    ])
+    if per_user.empty:
+        raise ValueError("No users with observed long_view positives in the evaluation set.")
+    metrics["paired_bootstrap"] = paired_bootstrap(per_user.ndcg_two_tower.to_numpy(), per_user.ndcg_popularity.to_numpy(), seed=seed)
+    for method in ("two_tower", "popularity"):
+        hits = per_user[f"positive_hits_{method}"]
+        metrics[f"positive_hits_{method}"] = int(hits.sum())
+        metrics[f"users_with_positive_hit_{method}"] = int((hits > 0).sum())
+    run_id = f"e2e_{ranking.name}_with_safety" if apply_safety else f"e2e_{ranking.name}_no_safety"
+    ARTIFACTS.mkdir(parents=True, exist_ok=True)
+    per_user_path = ARTIFACTS / f"{run_id}_per_user.parquet"
+    per_user.to_parquet(per_user_path, index=False)
+    write_result(run_id, "e2e", metrics, config={
+        "ranker": ranking.name, "retrieve_k": retrieve_k, "top_k": top_k, "apply_safety": apply_safety,
+        "safety_threshold": SAFETY_THRESHOLD, "fusion_weights": list(ranking.fusion_weights),
+        "feature_transformer_hash": config_hash(ranking.transformer.to_dict()), "index": "flat",
+        "max_users": max_users, "evaluation_file": "interactions_test_random.parquet",
+        "cohort": "users with at least one observed long_view positive",
+    }, seed=seed, extra={"per_user_scores": str(per_user_path),
+        "interpretation": "Observed-positive offline ranking; missing user-item outcomes are not observed negatives. Bootstrap covers user sampling, not training-seed variation."})
     print(metrics)
     return metrics
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--max-users", type=int, default=1000)
+    parser.add_argument("--max-users", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--no-safety", action="store_true")
+    parser.add_argument("--ranker", choices=["lr", "mmoe"], default="lr")
     args = parser.parse_args()
-    run_pipeline(max_users=args.max_users, apply_safety=not args.no_safety, seed=args.seed)
+    run_pipeline(max_users=args.max_users, apply_safety=not args.no_safety, seed=args.seed, ranker=args.ranker)
     if not args.no_safety:
-        run_pipeline(max_users=args.max_users, apply_safety=False, seed=args.seed)
+        run_pipeline(max_users=args.max_users, apply_safety=False, seed=args.seed, ranker=args.ranker)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,8 @@
-"""Retrieval baselines: global popularity and ItemCF."""
+"""Retrieval baselines: global popularity and ItemCF.
+
+All retrievers allow previously seen items: repeat engagement is a valid target
+in the random-exposure log. Evaluation uses the same seeded positive-user cohort.
+"""
 
 from __future__ import annotations
 
@@ -35,7 +39,7 @@ def popularity_recommend(
     train: pd.DataFrame,
     users: list[int],
     k: int = 200,
-    label: str = "is_click",
+    label: str = "long_view",
 ) -> dict[int, list[int]]:
     scores = train.groupby("video_id")[label].sum().sort_values(ascending=False)
     top = scores.index.astype(int).tolist()[:k]
@@ -79,11 +83,9 @@ def itemcf_recommend(
             recs[int(uid)] = item_ids[order].tolist()
             continue
         score = np.zeros(len(items_u), dtype=np.float32)
-        seen = set()
         for v in hist:
             if v not in i_index:
                 continue
-            seen.add(v)
             row = sims.getrow(i_index[v])
             # top neighbors only for speed
             if row.nnz > top_neighbors:
@@ -93,9 +95,6 @@ def itemcf_recommend(
                 score[idx[keep]] += data[keep]
             else:
                 score[row.indices] += row.data
-        for v in seen:
-            if v in i_index:
-                score[i_index[v]] = -1e9
         order = np.argsort(-score)[:k]
         recs[int(uid)] = item_ids[order].tolist()
     return recs
@@ -115,44 +114,55 @@ def evaluate_retrieval(
     return metrics
 
 
-def run_baselines(max_eval_users: int = 2000, seed: int = 42) -> None:
+def evaluation_cohort(
+    user_rel: dict[int, list[int]], max_eval_users: int = 2000, seed: int = 42,
+) -> dict[int, list[int]]:
+    """Select a reproducible cohort independently of input iteration order."""
+    if max_eval_users < 1:
+        raise ValueError("max_eval_users must be positive")
+    users = sorted(user_rel)
+    if len(users) > max_eval_users:
+        users = sorted(np.random.default_rng(seed).choice(users, max_eval_users, replace=False).tolist())
+    return {u: user_rel[u] for u in users}
+
+
+def run_baselines(max_eval_users: int = 2000, seed: int = 42, label: str = "long_view") -> None:
     train = pd.read_parquet(PROCESSED / "interactions_train.parquet")
     test = pd.read_parquet(PROCESSED / "interactions_test_random.parquet")
     videos = pd.read_parquet(PROCESSED / "videos.parquet")
     catalogue_size = int(videos["video_id"].nunique())
 
     user_rel = build_user_positives(test, label="long_view")
-    rng = np.random.default_rng(seed)
-    users = sorted(user_rel.keys())
-    if len(users) > max_eval_users:
-        users = sorted(rng.choice(users, size=max_eval_users, replace=False).tolist())
-    user_rel = {u: user_rel[u] for u in users}
+    user_rel = evaluation_cohort(user_rel, max_eval_users, seed)
+    users = list(user_rel)
 
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    pop_recs = popularity_recommend(train, users, k=200)
+    pop_recs = popularity_recommend(train, users, k=200, label=label)
     pop_metrics = evaluate_retrieval(user_rel, pop_recs, catalogue_size)
     write_result(
         "retrieval_popularity",
         "retrieval",
         pop_metrics,
-        config={"method": "popularity", "max_eval_users": max_eval_users},
+        config={"method": "popularity", "max_eval_users": max_eval_users,
+                "training_label": label, "evaluation_label": "long_view", "seen_item_policy": "allow_repeats"},
         seed=seed,
     )
     print("popularity", pop_metrics)
 
-    cf_recs = itemcf_recommend(train, users, k=200)
+    cf_recs = itemcf_recommend(train, users, k=200, label=label)
     cf_metrics = evaluate_retrieval(user_rel, cf_recs, catalogue_size)
     write_result(
         "retrieval_itemcf",
         "retrieval",
         cf_metrics,
-        config={"method": "itemcf", "max_eval_users": max_eval_users},
+        config={"method": "itemcf", "max_eval_users": max_eval_users,
+                "training_label": label, "evaluation_label": "long_view", "seen_item_policy": "allow_repeats"},
         seed=seed,
     )
     print("itemcf", cf_metrics)
 
     # Persist popularity list for serving fallback
-    pop = train.groupby("video_id")["is_click"].sum().sort_values(ascending=False)
+    pop = train.groupby("video_id")[label].sum().sort_values(ascending=False)
     (ARTIFACTS / "popularity_top.json").write_text(
         json.dumps([int(x) for x in pop.index.tolist()[:500]])
     )
@@ -162,8 +172,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--max-eval-users", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--label", choices=["long_view", "is_click"], default="long_view")
     args = parser.parse_args()
-    run_baselines(args.max_eval_users, args.seed)
+    run_baselines(args.max_eval_users, args.seed, args.label)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 
-def fuse(scores: np.ndarray, weights: tuple[float, float, float] = (0.3, 0.5, 0.2)) -> np.ndarray:
+def fuse(scores: np.ndarray, weights: tuple[float, float, float] = (0.25, 0.7, 0.05)) -> np.ndarray:
     """scores: [N, 3] for click, long_view, like."""
     w = np.asarray(weights, dtype=np.float32)
     w = w / w.sum()

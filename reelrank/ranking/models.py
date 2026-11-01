@@ -7,7 +7,7 @@ import torch.nn as nn
 
 
 class DeepFM(nn.Module):
-    def __init__(self, n_fields: int, emb_dim: int = 16, hidden: tuple[int, ...] = (128, 64)):
+    def __init__(self, n_fields: list[int], emb_dim: int = 16, hidden: tuple[int, ...] = (128, 64)):
         super().__init__()
         self.embeddings = nn.ModuleList(
             [nn.Embedding(n + 1, emb_dim, padding_idx=0) for n in n_fields]
@@ -21,6 +21,13 @@ class DeepFM(nn.Module):
             prev = h
         layers.append(nn.Linear(prev, 1))
         self.deep = nn.Sequential(*layers)
+        # FM sums many pairwise products; unit-normal embeddings saturate logits.
+        for embedding in self.embeddings:
+            nn.init.normal_(embedding.weight, std=0.01)
+            with torch.no_grad():
+                embedding.weight[0].zero_()
+        for embedding in self.fm_linear:
+            nn.init.zeros_(embedding.weight)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: [B, F] long
